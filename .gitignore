@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+*.exe
+*.AppImage
+*.dmg
+*.csv
+.env
+.DS_Store

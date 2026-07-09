@@ -1,0 +1,39 @@
+{
+  "name": "danea-shopify-sync-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --linux"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "papaparse": "^5.5.3"
+  },
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.easysyncpro.app",
+    "productName": "EasySync Pro",
+    "linux": {
+      "target": "AppImage"
+    },
+    "win": {
+      "target": ["portable", "nsis"]
+    }
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  }
+}
