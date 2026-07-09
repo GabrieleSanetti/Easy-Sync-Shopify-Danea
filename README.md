@@ -26,6 +26,28 @@ EasySync Pro is a powerful, locally-hosted Electron desktop application designed
 
 ---
 
+## Screenshots
+
+![image](https://i.postimg.cc/W1911jt3/aggiorna-scorte.png)
+*Check and Update Product Quantities Tab*
+
+![image](https://i.postimg.cc/BnhnnstL/nuovi-prodotti.png)
+*New Products Import Template*
+
+![image](https://i.postimg.cc/htCttghG/calcolatore-prezzi-oro.png)
+*Dynamic Pricing for Product Variants*
+
+![image](https://i.postimg.cc/MpsppxXf/impostazioni-mapping-scorte.png)
+*Setting - Update Quantities Columns Mapping*
+
+![image](https://i.postimg.cc/rwhwwczs/impostazioni-mapping-nuovi-prodotti.png)
+*Setting - New Products Template Columns Mapping*
+
+![image](https://i.postimg.cc/nhdhhZMM/impostazioni-avanzate-backup.png)
+*Setting - Import and Export Backups | Theme Settings*
+
+---
+
 ## Prerequisites
 
 - **Node.js**: v18 or higher (v20+ recommended)
