@@ -61,7 +61,7 @@ EasySync Pro is a powerful, locally-hosted Electron desktop application designed
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/easysync-pro.git
+git clone https://github.com/GabrieleSanetti/easysync-pro.git
 cd easysync-pro
 ```
 
