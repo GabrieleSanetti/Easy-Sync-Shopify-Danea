@@ -1,6 +1,6 @@
 # EasySync Pro - Danea & Shopify
 
-EasySync Pro is a powerful, locally-hosted Electron desktop application designed to streamline the synchronization of inventory and dynamic pricing between Danea EasyFatt (or custom Excel exports) and Shopify. It acts as a robust middleware tool tailored for jewelry e-commerce, offering a built-in Dynamic Pricing Engine to automatically calculate variant prices based on real-time gold quotes (to insert manually), specific weights, and size rules.
+EasySync Pro is a powerful, locally-hosted Electron desktop application designed to streamline the synchronization of inventory and dynamic pricing between Danea EasyFatt (or custom Excel exports) and Shopify. It acts as a robust middleware tool tailored for jewelry e-commerce, offering a built-in Dynamic Pricing Engine to automatically calculate variant prices based on real-time gold quotes, specific weights, and size rules.
 
 ## Key Features
 
@@ -9,8 +9,6 @@ EasySync Pro is a powerful, locally-hosted Electron desktop application designed
 - **Rule Management**: Set rules per-product or per-category (fixed weight vs variable weight) with specific size ranges (e.g., EU sizes 8 to 31).
 - **Intelligent Rounding**: Built-in math parsing and European locale parsing (`72,50` to `72.50`), with automatic rounding to the nearest integer.
 - **Shopify CSV Generation**: Instantly generate Shopify-compatible CSV files ready for bulk import, automatically updating variants, prices, and stock levels.
-- **Sheets Mapping**: Columns mapping of the excel main sheet to shopify csv template or set fixed value on specific columns.
-- **Setting Import/Export**: Settings import and export to use the application on different devices.
 
 ---
 
@@ -23,28 +21,6 @@ EasySync Pro is a powerful, locally-hosted Electron desktop application designed
   - `exceljs` (Parsing and reading `.xlsx` files)
   - `papaparse` (Generating standardized CSVs for Shopify)
 - **Security**: Strict Context Isolation with preloaded IPC bridges. Math evaluation executes securely in the Node backend avoiding `unsafe-eval` CSP violations in the renderer.
-
----
-
-## Screenshots
-
-![image](https://i.postimg.cc/W1911jt3/aggiorna-scorte.png)
-*Check and Update Product Quantities Tab*
-
-![image](https://i.postimg.cc/BnhnnstL/nuovi-prodotti.png)
-*New Products Import Template*
-
-![image](https://i.postimg.cc/htCttghG/calcolatore-prezzi-oro.png)
-*Dynamic Pricing for Product Variants*
-
-![image](https://i.postimg.cc/MpsppxXf/impostazioni-mapping-scorte.png)
-*Setting - Update Quantities Columns Mapping*
-
-![image](https://i.postimg.cc/rwhwwczs/impostazioni-mapping-nuovi-prodotti.png)
-*Setting - New Products Template Columns Mapping*
-
-![image](https://i.postimg.cc/nhdhhZMM/impostazioni-avanzate-backup.png)
-*Setting - Import and Export Backups | Theme Settings*
 
 ---
 
@@ -61,7 +37,7 @@ EasySync Pro is a powerful, locally-hosted Electron desktop application designed
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/GabrieleSanetti/easysync-pro.git
+git clone https://github.com/yourusername/easysync-pro.git
 cd easysync-pro
 ```
 

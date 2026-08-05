@@ -11,5 +11,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importSettings: () => ipcRenderer.invoke('import-settings'),
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   calculatePrices: (data) => ipcRenderer.invoke('calculate-prices', data),
-  evalFormula: (formula) => ipcRenderer.invoke('eval-formula', formula)
+  evalFormula: (formula) => ipcRenderer.invoke('eval-formula', formula),
+  
+  // Auto-Updater
+  onUpdateAvailable: (callback) => ipcRenderer.on('update:available', (_event, info) => callback(info)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update:downloaded', () => callback()),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+
+  // Danea Sync & Shopify API
+  onDaneaPreview: (callback) => ipcRenderer.on('danea:preview', (_event, data) => callback(data)),
+  syncShopifyQuantities: (products) => ipcRenderer.invoke('shopify:sync-quantities', products),
+  fetchNewOrders: () => ipcRenderer.invoke('shopify:fetch-new-orders'),
+  exportOrders: (selectedIds) => ipcRenderer.invoke('shopify:export-orders', selectedIds),
+  tagOrders: (selectedIds) => ipcRenderer.invoke('shopify:tag-orders', selectedIds)
 });

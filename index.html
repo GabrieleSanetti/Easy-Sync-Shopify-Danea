@@ -20,7 +20,9 @@
     <main>
       <div class="tabs">
         <button class="tab-btn active" data-target="sync-view">AGGIORNA SCORTE</button>
+        <button class="tab-btn" data-target="sync-preview-view" id="tab-btn-preview" style="display: none;">ANTEPRIMA</button>
         <button class="tab-btn" data-target="import-view">NUOVI PRODOTTI</button>
+        <button class="tab-btn" data-target="orders-view">ORDINI</button>
         <button class="tab-btn" data-target="calc-view">CALCOLATORE PREZZI</button>
         <button class="tab-btn" data-target="settings-view">IMPOSTAZIONI</button>
       </div>
@@ -130,10 +132,68 @@
         </div>
       </div>
 
+      <div class="tab-content" id="orders-view">
+        <div id="orders-initial-state" class="cards-container" style="justify-content: center;">
+          <div class="card" style="width: 600px; text-align: center;">
+            <div class="card-header">
+              <h2>ESPORTAZIONE ORDINI SHOPIFY</h2>
+              <p>Download manuale per Danea Easyfatt</p>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin: 20px 0;">
+              Scarica manualmente gli ordini da Shopify non ancora importati. Potrai selezionare quali ordini esportare e salvarli in formato XML compatibile con Danea.
+            </p>
+            <div class="upload-row" style="justify-content: center;">
+              <div class="drop-zone" id="btn-fetch-orders" style="cursor: pointer; border-color: var(--primary-color);">
+                <svg class="file-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <h3 style="margin-top: 15px; margin-bottom: 5px;">CERCA NUOVI ORDINI</h3>
+                <p style="font-size: 12px; color: var(--text-secondary);">Interroga Shopify per ordini da importare</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div id="orders-preview-state" class="card" style="width: 100%; display: none; flex-direction: column; min-height: 500px;">
+          <div class="card-header" style="display: flex; justify-content: space-between;">
+            <h2>Seleziona Ordini da Esportare</h2>
+            <button id="btn-cancel-orders" class="btn btn-outline btn-sm">ANNULLA</button>
+          </div>
+          <div style="flex: 1; overflow-y: auto; margin-top: 15px; margin-bottom: 20px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 8px; width: 40px;"><input type="checkbox" id="check-all-orders" checked></th>
+                  <th style="padding: 8px;">Ordine</th>
+                  <th style="padding: 8px;">Data</th>
+                  <th style="padding: 8px;">Cliente</th>
+                  <th style="padding: 8px;">Importo</th>
+                </tr>
+              </thead>
+              <tbody id="orders-table-body">
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid var(--border-color);">
+            <div id="orders-preview-summary" style="font-size: 13px; font-weight: 500;">
+              Ordini selezionati: 0
+            </div>
+            <div style="display: flex; gap: 10px; flex: 1; max-width: 500px; justify-content: flex-end;">
+              <button class="btn btn-primary" id="btn-export-xml-only" style="flex: 1; padding: 12px 20px; font-size: 14px; border-radius: 6px; margin: 0; display: flex; justify-content: center; align-items: center; text-align: center;">SCARICA XML</button>
+              <button class="btn btn-outline" id="btn-tag-orders-only" style="flex: 1; padding: 12px 20px; font-size: 14px; border-radius: 6px; margin: 0; display: flex; justify-content: center; align-items: center; text-align: center;">TAGGA COME SCARICATI</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="tab-content" id="settings-view">
         <div class="sub-tabs" style="margin-bottom: 20px;">
           <button class="tab-btn sub-tab-btn active" data-target="settings-scorte-content">SCORTE</button>
           <button class="tab-btn sub-tab-btn" data-target="settings-nuovi-content">NUOVI PRODOTTI</button>
+          <button class="tab-btn sub-tab-btn" data-target="settings-connessioni-content">CONNESSIONI API</button>
+          <button class="tab-btn sub-tab-btn" data-target="settings-aggiornamenti-content">AGGIORNAMENTI</button>
           <button class="tab-btn sub-tab-btn" data-target="settings-avanzate-content">AVANZATE</button>
         </div>
 
@@ -204,6 +264,81 @@
             </div>
           </div>
 
+          <!-- Settings: Connessioni API -->
+          <div class="card sub-tab-content" id="settings-connessioni-content" style="width: 100%; display: none;">
+            <div class="card-header">
+              <h2>CREDENZIALI SHOPIFY & DANEA SERVER</h2>
+              <p>Configura le chiavi API per l'aggiornamento automatico e la password per ricevere i dati da Danea</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; max-width: 600px;">
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Shopify Store URL (es. miostore.myshopify.com)</label>
+                <input type="text" id="api-store-url" class="mapping-select" style="width: 100%; display: block;" placeholder="miostore.myshopify.com">
+              </div>
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Shopify Client ID</label>
+                <input type="text" id="api-client-id" class="mapping-select" style="width: 100%; display: block;" placeholder="Client ID">
+              </div>
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Shopify Client Secret</label>
+                <input type="password" id="api-client-secret" class="mapping-select" style="width: 100%; display: block;" placeholder="Client Secret">
+              </div>
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Shopify Location ID (Obbligatorio per scorte)</label>
+                <input type="text" id="api-location-id" class="mapping-select" style="width: 100%; display: block;" placeholder="1234567890">
+              </div>
+              
+              <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
+              
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Nome Utente Server Danea (Opzionale)</label>
+                <input type="text" id="api-danea-username" class="mapping-select" style="width: 100%; display: block;" placeholder="Nome utente">
+              </div>
+              
+              <div>
+                <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px;">Password Server Danea (Opzionale)</label>
+                <input type="text" id="api-danea-password" class="mapping-select" style="width: 100%; display: block;" placeholder="Password segreta">
+              </div>
+              
+              <div class="action-container" style="margin-top: 10px; text-align: left;">
+                <button class="btn btn-primary btn-sm" id="btn-save-settings-connessioni">SALVA IMPOSTAZIONI API</button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Settings: Aggiornamenti -->
+          <div class="card sub-tab-content" id="settings-aggiornamenti-content" style="width: 100%; display: none;">
+            <div class="card-header">
+              <h2>SISTEMA DI AGGIORNAMENTO (DUAL-LAYER)</h2>
+              <p>Gestisci le patch rapide e gli aggiornamenti di base dell'applicazione</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 20px; max-width: 600px;">
+              
+              <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 6px;">
+                <h3 style="margin-bottom: 10px; font-size: 14px; color: var(--primary-color);">Aggiornamenti Rapidi (Hot-Patch)</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">Scarica immediatamente le ultime modifiche al codice senza bisogno di reinstallare l'app.</p>
+                
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn btn-primary btn-sm" id="btn-check-hot-patch">CERCA E INSTALLA PATCH</button>
+                  <button class="btn btn-outline btn-sm" id="btn-rollback-patch" style="color: #ff5252; border-color: #ff5252;">ROLLBACK: RIPRISTINA VERSIONE BASE</button>
+                </div>
+                <p id="hot-patch-status" style="font-size: 12px; margin-top: 10px; font-weight: bold;"></p>
+              </div>
+              
+              <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 6px;">
+                <h3 style="margin-bottom: 10px; font-size: 14px;">Aggiornamenti di Base (Software Completo)</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">Gli aggiornamenti completi vengono cercati automaticamente in background. Clicca qui per forzare la ricerca di una nuova versione maggiore.</p>
+                
+                <button class="btn btn-outline btn-sm" id="btn-check-base-update">CERCA AGGIORNAMENTO BASE</button>
+                <p id="base-update-status" style="font-size: 12px; margin-top: 10px; font-weight: bold;"></p>
+              </div>
+
+            </div>
+          </div>
+
+
           <!-- Settings: Avanzate -->
           <div class="card sub-tab-content" id="settings-avanzate-content" style="width: 100%; display: none;">
             <div class="card-header">
@@ -240,6 +375,72 @@
         </div>
       </div>
 
+      <div class="tab-content" id="sync-preview-view">
+        <div class="card" style="width: 100%; display: flex; flex-direction: column; min-height: 500px;">
+          <div class="card-header" style="display: flex; justify-content: space-between;">
+            <h2>Anteprima Sincronizzazione Scorte</h2>
+            <button id="btn-close-sync-modal" class="btn btn-outline btn-sm">TORNA INDIETRO</button>
+          </div>
+          
+          <div style="display: flex; gap: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
+            <button id="tab-to-update" style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-weight: bold; border-bottom: 2px solid var(--primary-color); padding-bottom: 5px;">Da aggiornare (0)</button>
+            <button id="tab-not-found" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding-bottom: 5px;">Non trovati su Shopify (0)</button>
+            <button id="tab-unchanged" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding-bottom: 5px;">Invariati (0)</button>
+          </div>
+
+          <div id="container-to-update" style="flex: 1; overflow-y: auto; margin-bottom: 20px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 8px;">SKU</th>
+                  <th style="padding: 8px;">Titolo</th>
+                  <th style="padding: 8px;">Q.ta Shopify</th>
+                  <th style="padding: 8px;">Nuova Q.ta</th>
+                  <th style="padding: 8px;">Variazione</th>
+                </tr>
+              </thead>
+              <tbody id="sync-preview-table-body">
+              </tbody>
+            </table>
+          </div>
+
+          <div id="container-not-found" style="display: none; flex: 1; overflow-y: auto; margin-bottom: 20px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 8px;">SKU</th>
+                  <th style="padding: 8px;">Titolo</th>
+                  <th style="padding: 8px;">Q.ta Danea</th>
+                  <th style="padding: 8px;">Dettaglio</th>
+                </tr>
+              </thead>
+              <tbody id="sync-notfound-table-body">
+              </tbody>
+            </table>
+          </div>
+
+          <div id="container-unchanged" style="display: none; flex: 1; overflow-y: auto; margin-bottom: 20px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 8px;">SKU</th>
+                  <th style="padding: 8px;">Titolo</th>
+                  <th style="padding: 8px;">Q.ta</th>
+                </tr>
+              </thead>
+              <tbody id="sync-unchanged-table-body">
+              </tbody>
+            </table>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color);">
+            <div id="sync-preview-summary" style="font-size: 13px; font-weight: 500;">
+              Elementi da aggiornare: 0
+            </div>
+            <button class="btn btn-primary" id="btn-confirm-sync">CONFERMA E AGGIORNA SU SHOPIFY</button>
+          </div>
+        </div>
+      </div>
       <div class="log-container">
         <div class="log-header">
           <h3>STATUS & LOG</h3>
@@ -335,6 +536,7 @@
       </div>
     </div>
   </div>
+
 
   <script src="renderer.js"></script>
 </body>

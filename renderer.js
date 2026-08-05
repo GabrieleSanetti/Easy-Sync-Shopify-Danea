@@ -208,6 +208,14 @@ async function loadSettings() {
       document.getElementById('template-nuovi-name').textContent = appSettings.nuovi.templatePath.split(/[\\/]/).pop();
     }
     
+    // API & Connessioni
+    document.getElementById('api-store-url').value = appSettings.shopifyStoreUrl || '';
+    document.getElementById('api-client-id').value = appSettings.shopifyClientId || '';
+    document.getElementById('api-client-secret').value = appSettings.shopifyClientSecret || '';
+    document.getElementById('api-location-id').value = appSettings.shopifyLocationId || '';
+    document.getElementById('api-danea-username').value = appSettings.daneaServerUsername || '';
+    document.getElementById('api-danea-password').value = appSettings.daneaServerPassword || '';
+
     // Inizializza Calculator UI
     if (!appSettings.calculator) {
       appSettings.calculator = { goldPrice: '', discount: '', rules: [] };
@@ -415,6 +423,23 @@ document.getElementById('btn-save-settings-nuovi').addEventListener('click', asy
   const res = await window.electronAPI.saveSettings(appSettings);
   if (res.success) {
     addLog('✅ Impostazioni e mapping Nuovi Prodotti salvati con successo.');
+  } else {
+    addLog(`❌ Errore nel salvataggio impostazioni: ${res.message}`);
+  }
+});
+
+// Save Settings Connessioni API
+document.getElementById('btn-save-settings-connessioni').addEventListener('click', async () => {
+  appSettings.shopifyStoreUrl = document.getElementById('api-store-url').value;
+  appSettings.shopifyClientId = document.getElementById('api-client-id').value;
+  appSettings.shopifyClientSecret = document.getElementById('api-client-secret').value;
+  appSettings.shopifyLocationId = document.getElementById('api-location-id').value;
+  appSettings.daneaServerUsername = document.getElementById('api-danea-username').value;
+  appSettings.daneaServerPassword = document.getElementById('api-danea-password').value;
+  
+  const res = await window.electronAPI.saveSettings(appSettings);
+  if (res.success) {
+    addLog('✅ Impostazioni API salvate con successo.');
   } else {
     addLog(`❌ Errore nel salvataggio impostazioni: ${res.message}`);
   }
@@ -813,6 +838,11 @@ if(btnSaveRule) btnSaveRule.addEventListener('click', async () => {
   if (!appSettings.calculator) appSettings.calculator = { rules: [] };
   if (!appSettings.calculator.rules) appSettings.calculator.rules = [];
   
+  if (index !== '') {
+    // Preserve existing active state if modifying
+    rule.active = appSettings.calculator.rules[Number(index)].active;
+  }
+  
   if (index === '') {
     appSettings.calculator.rules.push(rule);
   } else {
@@ -820,9 +850,262 @@ if(btnSaveRule) btnSaveRule.addEventListener('click', async () => {
   }
   
   await window.electronAPI.saveSettings(appSettings);
-  closeRuleModal();
   renderRules();
+  closeRuleModal();
 });
+
+let pendingSyncData = [];
+
+// === LOGICA ANTEPRIMA SINCRONIZZAZIONE DANEA ===
+window.electronAPI.onDaneaPreview((data) => {
+  pendingSyncData = data;
+  
+  const toUpdate = data.filter(p => p.oldQty !== null && p.changed);
+  const notFound = data.filter(p => p.oldQty === null);
+  const unchanged = data.filter(p => p.oldQty !== null && !p.changed);
+
+  const tabUpdate = document.getElementById('tab-to-update');
+  const tabNotFound = document.getElementById('tab-not-found');
+  const tabUnchanged = document.getElementById('tab-unchanged');
+  
+  const contUpdate = document.getElementById('container-to-update');
+  const contNotFound = document.getElementById('container-not-found');
+  const contUnchanged = document.getElementById('container-unchanged');
+  
+  tabUpdate.textContent = `Da aggiornare (${toUpdate.length})`;
+  tabNotFound.textContent = `Non trovati su Shopify (${notFound.length})`;
+  tabUnchanged.textContent = `Invariati (${unchanged.length})`;
+
+  const resetTabs = () => {
+    tabUpdate.style.borderBottom = 'none'; tabUpdate.style.color = 'var(--text-secondary)'; tabUpdate.style.fontWeight = 'normal';
+    tabNotFound.style.borderBottom = 'none'; tabNotFound.style.color = 'var(--text-secondary)'; tabNotFound.style.fontWeight = 'normal';
+    tabUnchanged.style.borderBottom = 'none'; tabUnchanged.style.color = 'var(--text-secondary)'; tabUnchanged.style.fontWeight = 'normal';
+    contUpdate.style.display = 'none';
+    contNotFound.style.display = 'none';
+    contUnchanged.style.display = 'none';
+  };
+
+  tabUpdate.onclick = () => { resetTabs(); tabUpdate.style.borderBottom = '2px solid var(--primary-color)'; tabUpdate.style.color = 'var(--text-primary)'; tabUpdate.style.fontWeight = 'bold'; contUpdate.style.display = 'block'; };
+  tabNotFound.onclick = () => { resetTabs(); tabNotFound.style.borderBottom = '2px solid var(--primary-color)'; tabNotFound.style.color = 'var(--text-primary)'; tabNotFound.style.fontWeight = 'bold'; contNotFound.style.display = 'block'; };
+  tabUnchanged.onclick = () => { resetTabs(); tabUnchanged.style.borderBottom = '2px solid var(--primary-color)'; tabUnchanged.style.color = 'var(--text-primary)'; tabUnchanged.style.fontWeight = 'bold'; contUnchanged.style.display = 'block'; };
+
+  const tbodyUpdate = document.getElementById('sync-preview-table-body');
+  tbodyUpdate.innerHTML = '';
+  toUpdate.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border-color)';
+    tr.innerHTML = `
+      <td style="padding: 8px;">${p.sku || 'N/A'}</td>
+      <td style="padding: 8px;">${p.title || 'Sconosciuto'}</td>
+      <td style="padding: 8px;">${p.oldQty}</td>
+      <td style="padding: 8px; font-weight: bold; color: var(--primary-color);">${p.newQty}</td>
+      <td style="padding: 8px; color: var(--primary-color);">
+        Da Aggiornare <br><small style="color:gray; font-size: 10px;">(Trovato tramite ${p.matchType})</small>
+      </td>
+    `;
+    tbodyUpdate.appendChild(tr);
+  });
+
+  const tbodyNotFound = document.getElementById('sync-notfound-table-body');
+  tbodyNotFound.innerHTML = '';
+  notFound.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border-color)';
+    tr.innerHTML = `
+      <td style="padding: 8px;">${p.sku || 'N/A'}</td>
+      <td style="padding: 8px;">${p.title || 'Sconosciuto'}</td>
+      <td style="padding: 8px;">${p.newQty}</td>
+      <td style="padding: 8px; color: red;">SKU non presente su Shopify</td>
+    `;
+    tbodyNotFound.appendChild(tr);
+  });
+
+  const tbodyUnchanged = document.getElementById('sync-unchanged-table-body');
+  tbodyUnchanged.innerHTML = '';
+  unchanged.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border-color)';
+    tr.innerHTML = `
+      <td style="padding: 8px;">${p.sku || 'N/A'}</td>
+      <td style="padding: 8px;">${p.title || 'Sconosciuto'}</td>
+      <td style="padding: 8px;">
+        ${p.oldQty} <br><small style="color:gray; font-size: 10px;">(Trovato tramite ${p.matchType})</small>
+      </td>
+    `;
+    tbodyUnchanged.appendChild(tr);
+  });
+
+  tabUpdate.onclick();
+
+  document.getElementById('sync-preview-summary').textContent = `Totale elementi da sincronizzare: ${toUpdate.length}`;
+  document.getElementById('btn-confirm-sync').disabled = toUpdate.length === 0;
+  
+  addLog(`Ricevuti ${data.length} prodotti da Danea. Di cui ${toUpdate.length} da aggiornare.`);
+  document.getElementById('tab-btn-preview').style.display = 'inline-block';
+  document.getElementById('tab-btn-preview').click();
+});
+
+document.getElementById('btn-close-sync-modal').addEventListener('click', () => {
+  document.querySelector('.tab-btn[data-target="sync-view"]').click();
+  document.getElementById('tab-btn-preview').style.display = 'none';
+  addLog('Sincronizzazione annullata dall\'utente.');
+  pendingSyncData = [];
+});
+
+document.getElementById('btn-confirm-sync').addEventListener('click', async () => {
+  if (pendingSyncData.length === 0) return;
+  
+  document.getElementById('btn-confirm-sync').disabled = true;
+  document.getElementById('btn-confirm-sync').textContent = 'AGGIORNAMENTO IN CORSO...';
+  
+  const toUpdate = pendingSyncData.filter(p => p.changed);
+  addLog(`Inizio sincronizzazione di ${toUpdate.length} prodotti su Shopify...`);
+  
+  const result = await window.electronAPI.syncShopifyQuantities(toUpdate);
+  
+  if (result.success) {
+    addLog(`✅ Sincronizzazione completata: aggiornati ${result.count} prodotti.`);
+    document.querySelector('.tab-btn[data-target="sync-view"]').click();
+    document.getElementById('tab-btn-preview').style.display = 'none';
+  } else {
+    addLog(`❌ Errore durante la sincronizzazione: ${result.message}`);
+    alert('Errore durante l\'aggiornamento Shopify:\n' + result.message);
+  }
+  
+  document.getElementById('btn-confirm-sync').textContent = 'CONFERMA E AGGIORNA SU SHOPIFY';
+  document.getElementById('btn-confirm-sync').disabled = false;
+  pendingSyncData = [];
+});
+
+let currentNewOrders = [];
+
+if (document.getElementById('btn-fetch-orders')) {
+  document.getElementById('btn-fetch-orders').addEventListener('click', async () => {
+    addLog('Ricerca nuovi ordini su Shopify in corso...');
+    const result = await window.electronAPI.fetchNewOrders();
+    
+    if (result.success) {
+      if (result.orders.length === 0) {
+        addLog('Nessun nuovo ordine da scaricare.');
+        alert('Nessun nuovo ordine trovato.');
+        return;
+      }
+      
+      currentNewOrders = result.orders;
+      
+      const tbody = document.getElementById('orders-table-body');
+      tbody.innerHTML = '';
+      currentNewOrders.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-color)';
+        tr.innerHTML = `
+          <td style="padding: 8px;"><input type="checkbox" class="order-checkbox" value="${o.id}" checked></td>
+          <td style="padding: 8px;">${o.order_number}</td>
+          <td style="padding: 8px;">${o.created_at}</td>
+          <td style="padding: 8px;">${o.customer}</td>
+          <td style="padding: 8px;">€ ${o.total_price}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      
+      document.getElementById('orders-initial-state').style.display = 'none';
+      document.getElementById('orders-preview-state').style.display = 'flex';
+      
+      updateOrderSelectionSummary();
+      addLog(`Trovati ${result.orders.length} nuovi ordini.`);
+    } else {
+      addLog(`❌ Errore ricerca ordini: ${result.message}`);
+    }
+  });
+}
+
+function updateOrderSelectionSummary() {
+  const checkboxes = document.querySelectorAll('.order-checkbox');
+  const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+  document.getElementById('orders-preview-summary').textContent = `Ordini selezionati: ${checked} su ${checkboxes.length}`;
+}
+
+if (document.getElementById('check-all-orders')) {
+  document.getElementById('check-all-orders').addEventListener('change', (e) => {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => cb.checked = e.target.checked);
+    updateOrderSelectionSummary();
+  });
+}
+
+document.getElementById('orders-table-body')?.addEventListener('change', (e) => {
+  if (e.target.classList.contains('order-checkbox')) {
+    updateOrderSelectionSummary();
+  }
+});
+
+if (document.getElementById('btn-cancel-orders')) {
+  document.getElementById('btn-cancel-orders').addEventListener('click', () => {
+    document.getElementById('orders-initial-state').style.display = 'flex';
+    document.getElementById('orders-preview-state').style.display = 'none';
+    currentNewOrders = [];
+  });
+}
+
+if (document.getElementById('btn-export-xml-only')) {
+  document.getElementById('btn-export-xml-only').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+      alert('Seleziona almeno un ordine da scaricare.');
+      return;
+    }
+    
+    addLog(`Generazione XML per ${selectedIds.length} ordini in corso...`);
+    document.getElementById('btn-export-xml-only').disabled = true;
+    
+    const result = await window.electronAPI.exportOrders(selectedIds);
+    
+    document.getElementById('btn-export-xml-only').disabled = false;
+    
+    if (result.success) {
+      addLog(`✅ Salvataggio completato! Esportati ${result.count} ordini nel file: ${result.path}`);
+      // Rimuoviamo gli ordini esportati dalla tabella corrente così non li esportano di nuovo per sbaglio?
+      // Oppure li lasciamo lì in modo che possano decidere di taggarli in un secondo momento. Li lasciamo.
+    } else {
+      addLog(`❌ Errore esportazione ordini: ${result.message}`);
+    }
+  });
+}
+
+if (document.getElementById('btn-tag-orders-only')) {
+  document.getElementById('btn-tag-orders-only').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+      alert('Seleziona almeno un ordine da taggare.');
+      return;
+    }
+    
+    if(!confirm(`Sei sicuro di voler taggare ${selectedIds.length} ordini come "Scaricato_Danea" su Shopify? Scompariranno dalle prossime ricerche.`)) {
+      return;
+    }
+    
+    addLog(`Tag di ${selectedIds.length} ordini su Shopify in corso...`);
+    document.getElementById('btn-tag-orders-only').disabled = true;
+    
+    const result = await window.electronAPI.tagOrders(selectedIds);
+    
+    document.getElementById('btn-tag-orders-only').disabled = false;
+    
+    if (result.success) {
+      addLog(`✅ Taggati con successo ${result.count} ordini!`);
+      // Ritorna allo stato iniziale
+      document.getElementById('orders-initial-state').style.display = 'flex';
+      document.getElementById('orders-preview-state').style.display = 'none';
+      currentNewOrders = [];
+    } else {
+      addLog(`❌ Errore durante il tag: ${result.message}`);
+    }
+  });
+}
 
 if(document.getElementById('btn-generate-prices')) {
   document.getElementById('btn-generate-prices').addEventListener('click', async () => {
@@ -852,6 +1135,75 @@ if(document.getElementById('btn-generate-prices')) {
     }
   });
 }
+
+// === LOGICA AGGIORNAMENTI ===
+
+const btnCheckHotPatch = document.getElementById('btn-check-hot-patch');
+const btnRollbackPatch = document.getElementById('btn-rollback-patch');
+const btnCheckBaseUpdate = document.getElementById('btn-check-base-update');
+const hotPatchStatus = document.getElementById('hot-patch-status');
+const baseUpdateStatus = document.getElementById('base-update-status');
+
+if (btnCheckHotPatch) {
+  btnCheckHotPatch.addEventListener('click', async () => {
+    hotPatchStatus.style.color = 'var(--text-secondary)';
+    hotPatchStatus.textContent = 'Ricerca patch in corso su GitHub...';
+    btnCheckHotPatch.disabled = true;
+    
+    const result = await window.electronAPI.checkHotPatch();
+    
+    if (result.success) {
+      hotPatchStatus.style.color = 'var(--primary-color)';
+      hotPatchStatus.textContent = `✅ Patch trovata e installata. Riavvia l'app per applicare le modifiche!`;
+      addLog('✅ Hot-Patch scaricata con successo.');
+    } else {
+      hotPatchStatus.style.color = 'red';
+      hotPatchStatus.textContent = result.message || 'Nessuna nuova patch trovata o errore di rete.';
+      addLog(`Info Hot-Patch: ${result.message}`);
+    }
+    btnCheckHotPatch.disabled = false;
+  });
+}
+
+if (btnRollbackPatch) {
+  btnRollbackPatch.addEventListener('click', async () => {
+    if (confirm('Sei sicuro di voler ripristinare la versione base? Tutte le patch verranno rimosse e l\'app si riavvierà.')) {
+      hotPatchStatus.style.color = 'orange';
+      hotPatchStatus.textContent = 'Rollback in corso...';
+      await window.electronAPI.rollbackHotPatch();
+    }
+  });
+}
+
+if (btnCheckBaseUpdate) {
+  btnCheckBaseUpdate.addEventListener('click', () => {
+    baseUpdateStatus.style.color = 'var(--text-secondary)';
+    baseUpdateStatus.textContent = 'Ricerca aggiornamento base in corso...';
+    btnCheckBaseUpdate.disabled = true;
+    window.electronAPI.checkBaseUpdate();
+  });
+}
+
+window.electronAPI.onUpdateAvailable((info) => {
+  if(baseUpdateStatus) {
+    baseUpdateStatus.style.color = 'orange';
+    baseUpdateStatus.textContent = `Nuova versione trovata (${info.version}). Download in corso...`;
+  }
+  addLog(`🔄 Trovato aggiornamento base: ${info.version}`);
+});
+
+window.electronAPI.onUpdateDownloaded(() => {
+  if(baseUpdateStatus) {
+    baseUpdateStatus.style.color = 'var(--primary-color)';
+    baseUpdateStatus.textContent = `✅ Download completato! Riavvia l'app per installare.`;
+  }
+  addLog('✅ Aggiornamento scaricato e pronto per l\'installazione.');
+  if (btnCheckBaseUpdate) {
+    btnCheckBaseUpdate.textContent = "INSTALLA E RIAVVIA";
+    btnCheckBaseUpdate.disabled = false;
+    btnCheckBaseUpdate.onclick = () => window.electronAPI.installUpdate();
+  }
+});
 
 // Initialize
 loadSettings();

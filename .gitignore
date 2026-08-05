@@ -7,3 +7,6 @@ build/
 *.csv
 .env
 .DS_Store
+*.log
+debug_*.js
+read_excel*.js
