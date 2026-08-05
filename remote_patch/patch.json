@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "files": {
+    "index.html": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/index.html",
+    "renderer.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/renderer.js",
+    "styles.css": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/styles.css"
+  }
+}
