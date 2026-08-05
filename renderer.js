@@ -958,7 +958,7 @@ document.getElementById('btn-confirm-sync').addEventListener('click', async () =
   document.getElementById('btn-confirm-sync').disabled = true;
   document.getElementById('btn-confirm-sync').textContent = 'AGGIORNAMENTO IN CORSO...';
   
-  const toUpdate = pendingSyncData.filter(p => p.changed);
+  const toUpdate = pendingSyncData.filter(p => p.oldQty !== null && p.changed);
   addLog(`Inizio sincronizzazione di ${toUpdate.length} prodotti su Shopify...`);
   
   const result = await window.electronAPI.syncShopifyQuantities(toUpdate);
