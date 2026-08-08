@@ -1,9 +1,6 @@
 {
-  "version": 1.8,
+  "version": 1.9,
   "files": {
-    "core.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/core.js",
-    "index.html": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/index.html",
-    "renderer.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/renderer.js",
-    "styles.css": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/styles.css"
+    "core.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/core.js"
   }
 }
