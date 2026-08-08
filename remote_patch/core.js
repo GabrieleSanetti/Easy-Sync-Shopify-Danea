@@ -74,53 +74,71 @@ app.commandLine.appendSwitch('disable-vulkan');
 
 let expressServer = null;
 
-app.whenReady().then(() => {
-  // Imposta l'avvio automatico all'accensione del PC in background
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    args: ['--hidden']
+// Implementazione Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 
-  mainWindow = createWindow();
-
-  // Creazione icona nella System Tray
-  const iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
-  if (fs.existsSync(iconPath)) {
-    tray = new Tray(iconPath);
-  } else {
-    // Fallback se l'icona build/icon.png non esiste
-    console.warn('Icona non trovata in ' + iconPath);
-  }
-
-  if (tray) {
-    const contextMenu = Menu.buildFromTemplate([
-      { label: 'Apri EasySync', click: () => { mainWindow.show(); } },
-      { type: 'separator' },
-      { label: 'Esci', click: () => { app.isQuiting = true; app.quit(); } }
-    ]);
-    tray.setToolTip('Easy-Sync Shopify-Danea');
-    tray.setContextMenu(contextMenu);
-
-    tray.on('click', () => {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide();
-      } else {
-        mainWindow.show();
-      }
+  app.whenReady().then(() => {
+    // Imposta l'avvio automatico all'accensione del PC in background
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      args: ['--hidden']
     });
-  }
 
-  if (app.isPackaged) {
-    setupAutoUpdater(mainWindow);
-  }
+    mainWindow = createWindow();
 
-  startExpressServer(mainWindow);
+    // Creazione icona nella System Tray
+    const { nativeImage } = require('electron');
+    const iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+    
+    if (fs.existsSync(iconPath)) {
+      tray = new Tray(iconPath);
+    } else {
+      // Fallback a un'icona di emergenza (quadratino blu) se manca icon.png
+      const fallbackIconBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAA6SURBVDhPY3iP7/w/EHMoAAAGMFAaRMCX/wYGBqQAYwYCDDBAGpUADDBAGpUADDBAGpUADGAAAw3iDwBOMpD4P1rYxgAAAABJRU5ErkJggg==';
+      tray = new Tray(nativeImage.createFromDataURL(fallbackIconBase64));
+    }
 
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
-    else mainWindow.show();
+    if (tray) {
+      const contextMenu = Menu.buildFromTemplate([
+        { label: 'Apri EasySync', click: () => { mainWindow.show(); } },
+        { type: 'separator' },
+        { label: 'Esci', click: () => { app.isQuiting = true; app.quit(); } }
+      ]);
+      tray.setToolTip('EasySync Shopify-Danea');
+      tray.setContextMenu(contextMenu);
+
+      tray.on('click', () => {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+        }
+      });
+    }
+
+    if (app.isPackaged) {
+      setupAutoUpdater(mainWindow);
+    }
+
+    startExpressServer(mainWindow);
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+      else mainWindow.show();
+    });
   });
-});
+}
 
 function setupAutoUpdater(win) {
   autoUpdater.autoDownload = true;
