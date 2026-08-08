@@ -542,11 +542,25 @@ function startExpressServer(win) {
       if (toUpdate.length > 0) {
         const result = await syncQuantitiesToShopify(toUpdate);
         updateMsg = `Aggiornati con successo ${result.count} prodotti su Shopify.`;
+        
+        try {
+          const historyPath = getHistoryPath();
+          let history = [];
+          if (fs.existsSync(historyPath)) {
+            history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+          }
+          history.unshift({
+            date: new Date().toISOString(),
+            count: result.count,
+            products: toUpdate.map(p => ({ sku: p.sku, title: p.title, newQty: p.newQty, oldQty: p.oldQty }))
+          });
+          if (history.length > 50) history = history.slice(0, 50);
+          fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf8');
+        } catch (e) { console.error('Error saving history', e); }
       }
       
-      // Se l'app è aperta, mandiamo comunque l'evento per aggiornare la UI
       if (win && !win.isDestroyed()) {
-        win.webContents.send('danea:preview', syncData);
+        win.webContents.send('danea:preview', { isHistoryUpdate: true });
       }
       
       if (tray) {
@@ -852,10 +866,28 @@ ipcMain.handle('shopify:tag-orders', async (event, selectedIds) => {
 });
 
 const SETTINGS_FILE = 'settings.json';
+const HISTORY_FILE = 'sync_history.json';
 
 function getSettingsPath() {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
 }
+
+function getHistoryPath() {
+  return path.join(app.getPath('userData'), HISTORY_FILE);
+}
+
+ipcMain.handle('shopify:get-history', async () => {
+  try {
+    const historyPath = getHistoryPath();
+    if (fs.existsSync(historyPath)) {
+      const data = fs.readFileSync(historyPath, 'utf8');
+      return { success: true, data: JSON.parse(data) };
+    }
+    return { success: true, data: [] };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
 
 ipcMain.handle('save-settings', async (event, settingsData) => {
   try {
@@ -870,10 +902,18 @@ ipcMain.handle('load-settings', async () => {
   try {
     const settingsPath = getSettingsPath();
     if (fs.existsSync(settingsPath)) {
-      const data = fs.readFileSync(settingsPath, 'utf8');
-      return { success: true, data: JSON.parse(data) };
+      const parsedData = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      try {
+        const historyPath = getHistoryPath();
+        if (fs.existsSync(historyPath)) {
+          parsedData._history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+        } else {
+          parsedData._history = [];
+        }
+      } catch (e) {}
+      return { success: true, data: parsedData };
     }
-    return { success: true, data: null };
+    return { success: true, data: { _history: [] } };
   } catch (error) {
     return { success: false, message: error.message };
   }
