@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// Permette a core.js hot-patchato (eseguito da APPDATA) di trovare i pacchetti originali
+module.paths.push(path.join(app.getAppPath(), 'node_modules'));
+
 const ExcelJS = require('exceljs');
 const Papa = require('papaparse');
 const express = require('express');
@@ -23,7 +27,7 @@ function createWindow() {
     height: 850,
     show: !isHidden, // Mostra solo se non avviato con --hidden
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(app.getAppPath(), 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -47,7 +51,7 @@ function createWindow() {
   if (fs.existsSync(patchedHtml)) {
     mainWindow.loadFile(patchedHtml);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
   }
   
   // Gestiamo la chiusura della finestra in modo che vada solo in background
@@ -80,7 +84,7 @@ app.whenReady().then(() => {
   mainWindow = createWindow();
 
   // Creazione icona nella System Tray
-  const iconPath = path.join(__dirname, 'build', 'icon.png');
+  const iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
   if (fs.existsSync(iconPath)) {
     tray = new Tray(iconPath);
   } else {
@@ -530,7 +534,7 @@ function startExpressServer(win) {
       new Notification({
         title: 'Sincronizzazione Danea completata',
         body: updateMsg,
-        icon: path.join(__dirname, 'build', 'icon.png')
+        icon: path.join(app.getAppPath(), 'build', 'icon.png')
       }).show();
       
       res.set('Content-Type', 'text/xml');
@@ -574,7 +578,7 @@ function startExpressServer(win) {
       new Notification({
         title: 'Scaricamento Ordini Danea',
         body: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
-        icon: path.join(__dirname, 'build', 'icon.png')
+        icon: path.join(app.getAppPath(), 'build', 'icon.png')
       }).show();
       
       res.set('Content-Type', 'text/xml');
