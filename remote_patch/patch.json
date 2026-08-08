@@ -1,5 +1,5 @@
 {
-  "version": 1.2,
+  "version": 1.4,
   "files": {
     "core.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/core.js"
   }
