@@ -23,5 +23,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncShopifyQuantities: (products) => ipcRenderer.invoke('shopify:sync-quantities', products),
   fetchNewOrders: () => ipcRenderer.invoke('shopify:fetch-new-orders'),
   exportOrders: (selectedIds) => ipcRenderer.invoke('shopify:export-orders', selectedIds),
-  tagOrders: (selectedIds) => ipcRenderer.invoke('shopify:tag-orders', selectedIds)
+  tagOrders: (selectedIds) => ipcRenderer.invoke('shopify:tag-orders', selectedIds),
+  exportNotFoundCsv: (data) => ipcRenderer.invoke('export-not-found-csv', data),
+  
+  // Hot Patch
+  checkHotPatch: () => ipcRenderer.invoke('patch:check'),
+  rollbackHotPatch: () => ipcRenderer.invoke('patch:rollback'),
+  checkBaseUpdate: () => ipcRenderer.invoke('update:check-base')
 });

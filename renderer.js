@@ -858,6 +858,11 @@ let pendingSyncData = [];
 
 // === LOGICA ANTEPRIMA SINCRONIZZAZIONE DANEA ===
 window.electronAPI.onDaneaPreview((data) => {
+  if (data && data.isHistoryUpdate) {
+    loadHistory();
+    return;
+  }
+  
   pendingSyncData = data;
   
   const toUpdate = data.filter(p => p.oldQty !== null && p.changed);
@@ -875,6 +880,8 @@ window.electronAPI.onDaneaPreview((data) => {
   tabUpdate.textContent = `Da aggiornare (${toUpdate.length})`;
   tabNotFound.textContent = `Non trovati su Shopify (${notFound.length})`;
   tabUnchanged.textContent = `Invariati (${unchanged.length})`;
+
+  const btnExportNotFound = document.getElementById('btn-export-not-found');
 
   const resetTabs = () => {
     tabUpdate.style.borderBottom = 'none'; tabUpdate.style.color = 'var(--text-secondary)'; tabUpdate.style.fontWeight = 'normal';
@@ -950,6 +957,20 @@ document.getElementById('btn-close-sync-modal').addEventListener('click', () => 
   document.getElementById('tab-btn-preview').style.display = 'none';
   addLog('Sincronizzazione annullata dall\'utente.');
   pendingSyncData = [];
+});
+
+document.getElementById('btn-export-not-found').addEventListener('click', async () => {
+  const notFound = pendingSyncData.filter(p => p.oldQty === null);
+  if (notFound.length === 0) {
+    alert("Nessun prodotto da esportare.");
+    return;
+  }
+  const result = await window.electronAPI.exportNotFoundCsv(notFound);
+  if (result.success) {
+    addLog(`✅ Esportati ${notFound.length} prodotti non trovati in CSV.`);
+  } else if (!result.canceled) {
+    alert('Errore durante l\'esportazione: ' + result.message);
+  }
 });
 
 document.getElementById('btn-confirm-sync').addEventListener('click', async () => {
@@ -1207,3 +1228,68 @@ window.electronAPI.onUpdateDownloaded(() => {
 
 // Initialize
 loadSettings();
+
+// History Logic
+const historyContainer = document.getElementById('history-container');
+const btnRefreshHistory = document.getElementById('btn-refresh-history');
+
+if (btnRefreshHistory) {
+  btnRefreshHistory.addEventListener('click', () => loadHistory());
+}
+
+async function loadHistory() {
+  if (!historyContainer) return;
+  try {
+    const res = await window.electronAPI.loadSettings();
+    if (res.success && res.data && res.data._history) {
+      renderHistory(res.data._history);
+    }
+  } catch (e) {
+    console.error('Error loading history', e);
+  }
+}
+
+function renderHistory(historyArray) {
+  if (!historyArray || historyArray.length === 0) {
+    historyContainer.innerHTML = '<p id="no-history-msg" style="color: var(--text-secondary); text-align: center; margin-top: 20px;">Nessuno storico disponibile.</p>';
+    return;
+  }
+  
+  historyContainer.innerHTML = '';
+  
+  historyArray.forEach(item => {
+    const dateObj = new Date(item.date);
+    const dateStr = dateObj.toLocaleDateString('it-IT') + ' ' + dateObj.toLocaleTimeString('it-IT');
+    
+    const div = document.createElement('div');
+    div.style.background = 'var(--bg-color)';
+    div.style.border = '1px solid var(--border-color)';
+    div.style.borderRadius = '6px';
+    div.style.padding = '10px';
+    
+    let html = `<div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 5px;">
+      <strong style="color: var(--primary-color);">${dateStr}</strong>
+      <span>${item.count} prodotti aggiornati</span>
+    </div>`;
+    
+    if (item.products && item.products.length > 0) {
+      html += `<div style="max-height: 150px; overflow-y: auto;">
+        <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr><th style="padding: 4px;">SKU</th><th style="padding: 4px;">Nuova Q.ta</th><th style="padding: 4px;">Vecchia Q.ta</th></tr>
+          </thead>
+          <tbody>`;
+      item.products.forEach(p => {
+        html += `<tr><td style="padding: 4px;">${p.sku}</td><td style="padding: 4px;">${p.newQty}</td><td style="padding: 4px;">${p.oldQty}</td></tr>`;
+      });
+      html += `</tbody></table></div>`;
+    }
+    
+    div.innerHTML = html;
+    historyContainer.appendChild(div);
+  });
+}
+
+// Initial load
+loadHistory();
+

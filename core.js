@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// Permette a core.js hot-patchato (eseguito da APPDATA) di trovare i pacchetti originali
+module.paths.push(path.join(app.getAppPath(), 'node_modules'));
+
 const ExcelJS = require('exceljs');
 const Papa = require('papaparse');
 const express = require('express');
@@ -23,7 +27,7 @@ function createWindow() {
     height: 850,
     show: !isHidden, // Mostra solo se non avviato con --hidden
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(app.getAppPath(), 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -47,7 +51,7 @@ function createWindow() {
   if (fs.existsSync(patchedHtml)) {
     mainWindow.loadFile(patchedHtml);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.loadFile(path.join(app.getAppPath(), 'index.html'));
   }
   
   // Gestiamo la chiusura della finestra in modo che vada solo in background
@@ -70,53 +74,77 @@ app.commandLine.appendSwitch('disable-vulkan');
 
 let expressServer = null;
 
-app.whenReady().then(() => {
-  // Imposta l'avvio automatico all'accensione del PC in background
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    args: ['--hidden']
+// Implementazione Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 
-  mainWindow = createWindow();
+  app.whenReady().then(() => {
+    const autoStartArgs = [];
+    if (!app.isPackaged) {
+      autoStartArgs.push(app.getAppPath());
+    }
+    autoStartArgs.push('--hidden');
 
-  // Creazione icona nella System Tray
-  const iconPath = path.join(__dirname, 'build', 'icon.png');
-  if (fs.existsSync(iconPath)) {
-    tray = new Tray(iconPath);
-  } else {
-    // Fallback se l'icona build/icon.png non esiste
-    console.warn('Icona non trovata in ' + iconPath);
-  }
-
-  if (tray) {
-    const contextMenu = Menu.buildFromTemplate([
-      { label: 'Apri EasySync', click: () => { mainWindow.show(); } },
-      { type: 'separator' },
-      { label: 'Esci', click: () => { app.isQuiting = true; app.quit(); } }
-    ]);
-    tray.setToolTip('Easy-Sync Shopify-Danea');
-    tray.setContextMenu(contextMenu);
-
-    tray.on('click', () => {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide();
-      } else {
-        mainWindow.show();
-      }
+    // Imposta l'avvio automatico all'accensione del PC in background
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      args: autoStartArgs
     });
-  }
 
-  if (app.isPackaged) {
-    setupAutoUpdater(mainWindow);
-  }
+    mainWindow = createWindow();
 
-  startExpressServer(mainWindow);
+    // Creazione icona nella System Tray
+    const { nativeImage } = require('electron');
+    const iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+    
+    if (fs.existsSync(iconPath)) {
+      tray = new Tray(iconPath);
+    } else {
+      // Fallback a un'icona di emergenza (quadratino blu) se manca icon.png
+      const fallbackIconBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAA6SURBVDhPY3iP7/w/EHMoAAAGMFAaRMCX/wYGBqQAYwYCDDBAGpUADDBAGpUADDBAGpUADGAAAw3iDwBOMpD4P1rYxgAAAABJRU5ErkJggg==';
+      tray = new Tray(nativeImage.createFromDataURL(fallbackIconBase64));
+    }
 
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
-    else mainWindow.show();
+    if (tray) {
+      const contextMenu = Menu.buildFromTemplate([
+        { label: 'Apri EasySync', click: () => { mainWindow.show(); } },
+        { type: 'separator' },
+        { label: 'Esci', click: () => { app.isQuiting = true; app.quit(); } }
+      ]);
+      tray.setToolTip('EasySync Shopify-Danea');
+      tray.setContextMenu(contextMenu);
+
+      tray.on('click', () => {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+        }
+      });
+    }
+
+    if (app.isPackaged) {
+      setupAutoUpdater(mainWindow);
+    }
+
+    startExpressServer(mainWindow);
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+      else mainWindow.show();
+    });
   });
-});
+}
 
 function setupAutoUpdater(win) {
   autoUpdater.autoDownload = true;
@@ -520,24 +548,40 @@ function startExpressServer(win) {
       if (toUpdate.length > 0) {
         const result = await syncQuantitiesToShopify(toUpdate);
         updateMsg = `Aggiornati con successo ${result.count} prodotti su Shopify.`;
+        
+        try {
+          const historyPath = getHistoryPath();
+          let history = [];
+          if (fs.existsSync(historyPath)) {
+            history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+          }
+          history.unshift({
+            date: new Date().toISOString(),
+            count: result.count,
+            products: toUpdate.map(p => ({ sku: p.sku, title: p.title, newQty: p.newQty, oldQty: p.oldQty }))
+          });
+          if (history.length > 50) history = history.slice(0, 50);
+          fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf8');
+        } catch (e) { console.error('Error saving history', e); }
       }
       
-      // Se l'app è aperta, mandiamo comunque l'evento per aggiornare la UI
       if (win && !win.isDestroyed()) {
-        win.webContents.send('danea:preview', syncData);
+        win.webContents.send('danea:preview', { isHistoryUpdate: true });
       }
       
-      new Notification({
-        title: 'Sincronizzazione Danea completata',
-        body: updateMsg,
-        icon: path.join(__dirname, 'build', 'icon.png')
-      }).show();
+      if (tray) {
+        tray.displayBalloon({
+          title: 'Sincronizzazione Danea completata',
+          content: updateMsg,
+          iconType: 'info'
+        });
+      }
       
-      res.set('Content-Type', 'text/xml');
-      res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>OK</Status></Easyfatt>');
+      res.set('Content-Type', 'text/plain');
+      res.status(200).send('OK');
     } catch (error) {
       console.error(error);
-      res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>ERROR</Status><ErrorDescription>' + error.message + '</ErrorDescription></Easyfatt>');
+      res.status(500).send(error.message);
     }
   });
   server.get('/danea-orders', async (req, res) => {
@@ -571,11 +615,13 @@ function startExpressServer(win) {
 
       const result = await generateDaneaOrdersXml(null, true);
       
-      new Notification({
-        title: 'Scaricamento Ordini Danea',
-        body: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
-        icon: path.join(__dirname, 'build', 'icon.png')
-      }).show();
+      if (tray) {
+        tray.displayBalloon({
+          title: 'Scaricamento Ordini Danea',
+          content: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
+          iconType: 'info'
+        });
+      }
       
       res.set('Content-Type', 'text/xml');
       res.send(result.xml);
@@ -826,10 +872,28 @@ ipcMain.handle('shopify:tag-orders', async (event, selectedIds) => {
 });
 
 const SETTINGS_FILE = 'settings.json';
+const HISTORY_FILE = 'sync_history.json';
 
 function getSettingsPath() {
   return path.join(app.getPath('userData'), SETTINGS_FILE);
 }
+
+function getHistoryPath() {
+  return path.join(app.getPath('userData'), HISTORY_FILE);
+}
+
+ipcMain.handle('shopify:get-history', async () => {
+  try {
+    const historyPath = getHistoryPath();
+    if (fs.existsSync(historyPath)) {
+      const data = fs.readFileSync(historyPath, 'utf8');
+      return { success: true, data: JSON.parse(data) };
+    }
+    return { success: true, data: [] };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
 
 ipcMain.handle('save-settings', async (event, settingsData) => {
   try {
@@ -844,10 +908,18 @@ ipcMain.handle('load-settings', async () => {
   try {
     const settingsPath = getSettingsPath();
     if (fs.existsSync(settingsPath)) {
-      const data = fs.readFileSync(settingsPath, 'utf8');
-      return { success: true, data: JSON.parse(data) };
+      const parsedData = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      try {
+        const historyPath = getHistoryPath();
+        if (fs.existsSync(historyPath)) {
+          parsedData._history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+        } else {
+          parsedData._history = [];
+        }
+      } catch (e) {}
+      return { success: true, data: parsedData };
     }
-    return { success: true, data: null };
+    return { success: true, data: { _history: [] } };
   } catch (error) {
     return { success: false, message: error.message };
   }
