@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
@@ -14,10 +14,14 @@ const patchDir = global.PATCH_DIR || path.join(userDataPath, 'patch');
 
 let mainWindow;
 
+let tray = null;
+
 function createWindow() {
+  const isHidden = process.argv.includes('--hidden');
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 850,
+    show: !isHidden, // Mostra solo se non avviato con --hidden
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -46,6 +50,15 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
   }
   
+  // Gestiamo la chiusura della finestra in modo che vada solo in background
+  mainWindow.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+    return false;
+  });
+
   setupAutoUpdater(mainWindow);
   
   return mainWindow;
@@ -58,7 +71,40 @@ app.commandLine.appendSwitch('disable-vulkan');
 let expressServer = null;
 
 app.whenReady().then(() => {
+  // Imposta l'avvio automatico all'accensione del PC in background
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    args: ['--hidden']
+  });
+
   mainWindow = createWindow();
+
+  // Creazione icona nella System Tray
+  const iconPath = path.join(__dirname, 'build', 'icon.png');
+  if (fs.existsSync(iconPath)) {
+    tray = new Tray(iconPath);
+  } else {
+    // Fallback se l'icona build/icon.png non esiste
+    console.warn('Icona non trovata in ' + iconPath);
+  }
+
+  if (tray) {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Apri EasySync', click: () => { mainWindow.show(); } },
+      { type: 'separator' },
+      { label: 'Esci', click: () => { app.isQuiting = true; app.quit(); } }
+    ]);
+    tray.setToolTip('Easy-Sync Shopify-Danea');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+      }
+    });
+  }
 
   if (app.isPackaged) {
     setupAutoUpdater(mainWindow);
@@ -68,6 +114,7 @@ app.whenReady().then(() => {
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+    else mainWindow.show();
   });
 });
 
@@ -221,42 +268,72 @@ async function getShopifyInventoryMap(storeUrl, token) {
   return { mapBySku, mapByHandle };
 }
 
+ipcMain.handle('export-not-found-csv', async (event, data) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Esporta SKU non trovati in CSV',
+      defaultPath: `SKU_Non_Trovati_${new Date().toISOString().split('T')[0]}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    });
+    
+    if (canceled || !filePath) return { success: false, canceled: true };
+    
+    const headers = "SKU,Titolo Danea,Quantita\\r\\n";
+    const rows = data.map(p => {
+      const sku = (p.sku || '').replace(/"/g, '""');
+      const title = (p.title || '').replace(/"/g, '""');
+      const qty = p.newQty || 0;
+      return `"${sku}","${title}",${qty}`;
+    }).join("\\r\\n");
+    
+    // Aggiungi il BOM per preservare i caratteri speciali
+    fs.writeFileSync(filePath, headers + rows, 'utf8');
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+async function syncQuantitiesToShopify(productsToUpdate) {
+  const settingsPath = getSettingsPath();
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const storeUrl = settings?.shopifyStoreUrl;
+  
+  let token = settings?.shopifyApiToken;
+  const clientId = settings?.shopifyClientId;
+  const clientSecret = settings?.shopifyClientSecret;
+  
+  if (!storeUrl) throw new Error('Configura l\'URL dello store Shopify nelle Impostazioni');
+  if (!token && (!clientId || !clientSecret)) {
+    throw new Error('Configura le credenziali Shopify (Client ID e Secret) nelle Impostazioni');
+  }
+  
+  if (!token && clientId && clientSecret) {
+    token = await getShopifyAccessToken(storeUrl, clientId, clientSecret);
+  }
+  
+  const cleanUrl = storeUrl.replace('https://', '').replace(/\/$/, '');
+  let successCount = 0;
+  
+  for (const prod of productsToUpdate) {
+    if (!prod.itemId) continue;
+    
+    await axios.post(`https://${cleanUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+      location_id: settings.shopifyLocationId || '', 
+      inventory_item_id: prod.itemId,
+      available: prod.newQty
+    }, {
+      headers: { 'X-Shopify-Access-Token': token }
+    });
+    successCount++;
+  }
+  
+  return { success: true, count: successCount };
+}
+
 ipcMain.handle('shopify:sync-quantities', async (event, productsToUpdate) => {
   try {
-    const settingsPath = getSettingsPath();
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    const storeUrl = settings?.shopifyStoreUrl;
-    
-    let token = settings?.shopifyApiToken;
-    const clientId = settings?.shopifyClientId;
-    const clientSecret = settings?.shopifyClientSecret;
-    
-    if (!storeUrl) throw new Error('Configura l\'URL dello store Shopify nelle Impostazioni');
-    if (!token && (!clientId || !clientSecret)) {
-      throw new Error('Configura le credenziali Shopify (Client ID e Secret) nelle Impostazioni');
-    }
-    
-    if (!token && clientId && clientSecret) {
-      token = await getShopifyAccessToken(storeUrl, clientId, clientSecret);
-    }
-    
-    const cleanUrl = storeUrl.replace('https://', '').replace(/\/$/, '');
-    let successCount = 0;
-    
-    for (const prod of productsToUpdate) {
-      if (!prod.itemId) continue;
-      
-      await axios.post(`https://${cleanUrl}/admin/api/2024-01/inventory_levels/set.json`, {
-        location_id: settings.shopifyLocationId || '', 
-        inventory_item_id: prod.itemId,
-        available: prod.newQty
-      }, {
-        headers: { 'X-Shopify-Access-Token': token }
-      });
-      successCount++;
-    }
-    
-    return { success: true, count: successCount };
+    return await syncQuantitiesToShopify(productsToUpdate);
   } catch (error) {
     return { success: false, message: error.message };
   }
@@ -437,11 +514,30 @@ function startExpressServer(win) {
       });
       
       const syncData = Array.from(syncDataMap.values()).concat(unmatchedProducts);
-      win.webContents.send('danea:preview', syncData);
-      res.status(200).send('Dati ricevuti con successo, controlla l\'app per l\'anteprima.');
+      const toUpdate = syncData.filter(p => p.itemId && p.changed);
+      
+      let updateMsg = `Nessun prodotto da aggiornare.`;
+      if (toUpdate.length > 0) {
+        const result = await syncQuantitiesToShopify(toUpdate);
+        updateMsg = `Aggiornati con successo ${result.count} prodotti su Shopify.`;
+      }
+      
+      // Se l'app è aperta, mandiamo comunque l'evento per aggiornare la UI
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('danea:preview', syncData);
+      }
+      
+      new Notification({
+        title: 'Sincronizzazione Danea completata',
+        body: updateMsg,
+        icon: path.join(__dirname, 'build', 'icon.png')
+      }).show();
+      
+      res.set('Content-Type', 'text/xml');
+      res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>OK</Status></Easyfatt>');
     } catch (error) {
       console.error(error);
-      res.status(500).send('Error processing XML: ' + error.message);
+      res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>ERROR</Status><ErrorDescription>' + error.message + '</ErrorDescription></Easyfatt>');
     }
   });
   server.get('/danea-orders', async (req, res) => {
@@ -474,6 +570,13 @@ function startExpressServer(win) {
       }
 
       const result = await generateDaneaOrdersXml(null, true);
+      
+      new Notification({
+        title: 'Scaricamento Ordini Danea',
+        body: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
+        icon: path.join(__dirname, 'build', 'icon.png')
+      }).show();
+      
       res.set('Content-Type', 'text/xml');
       res.send(result.xml);
     } catch (error) {
@@ -669,7 +772,7 @@ async function tagOrdersOnShopify(selectedIds) {
 
 
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit();
+  // L'app rimane attiva in background (System Tray)
 });
 
 // IPC Handler for file selection
