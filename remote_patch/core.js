@@ -531,17 +531,19 @@ function startExpressServer(win) {
         win.webContents.send('danea:preview', syncData);
       }
       
-      new Notification({
-        title: 'Sincronizzazione Danea completata',
-        body: updateMsg,
-        icon: path.join(app.getAppPath(), 'build', 'icon.png')
-      }).show();
+      if (tray) {
+        tray.displayBalloon({
+          title: 'Sincronizzazione Danea completata',
+          content: updateMsg,
+          iconType: 'info'
+        });
+      }
       
-      res.set('Content-Type', 'text/xml');
-      res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>OK</Status></Easyfatt>');
+      res.set('Content-Type', 'text/plain');
+      res.status(200).send('OK');
     } catch (error) {
       console.error(error);
-      res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><Easyfatt><Status>ERROR</Status><ErrorDescription>' + error.message + '</ErrorDescription></Easyfatt>');
+      res.status(500).send(error.message);
     }
   });
   server.get('/danea-orders', async (req, res) => {
@@ -575,11 +577,13 @@ function startExpressServer(win) {
 
       const result = await generateDaneaOrdersXml(null, true);
       
-      new Notification({
-        title: 'Scaricamento Ordini Danea',
-        body: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
-        icon: path.join(app.getAppPath(), 'build', 'icon.png')
-      }).show();
+      if (tray) {
+        tray.displayBalloon({
+          title: 'Scaricamento Ordini Danea',
+          content: `Scaricati ${result.count || 0} nuovi ordini da Shopify.`,
+          iconType: 'info'
+        });
+      }
       
       res.set('Content-Type', 'text/xml');
       res.send(result.xml);
