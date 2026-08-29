@@ -105,7 +105,15 @@ if (!gotTheLock) {
 
     // Creazione icona nella System Tray
     const { nativeImage } = require('electron');
-    const iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+    let iconPath = path.join(app.getAppPath(), 'build', 'icon.png');
+    
+    // Se c'è una patch, usa l'icona scaricata dalla patch
+    if (global.IS_HOT_PATCH && global.PATCH_DIR) {
+      const patchedIcon = path.join(global.PATCH_DIR, 'icon.png');
+      if (fs.existsSync(patchedIcon)) {
+        iconPath = patchedIcon;
+      }
+    }
     
     if (fs.existsSync(iconPath)) {
       tray = new Tray(iconPath);
