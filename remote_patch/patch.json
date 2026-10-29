@@ -1,10 +1,33 @@
 {
-  "version": 1.11,
+  "version": 1000,
+  "versionLabel": "1.0",
+  "createdAt": "2026-10-29T10:47:52.991Z",
   "files": {
-    "core.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/core.js",
-    "index.html": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/index.html",
-    "renderer.js": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/renderer.js",
-    "styles.css": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/styles.css",
-    "icon.png": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/icon.png"
-  }
+    "core.js": {
+      "url": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/files/core.js",
+      "sha256": "410bfe999fbc46779b7c3f10ca1121b756eaa4222b357a9b236bd23a8740ac98",
+      "size": 52368
+    },
+    "index.html": {
+      "url": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/files/index.html",
+      "sha256": "0a9bedc0f32e0fda6b35c949f9f17524dd3144e41eb54d45b33fac6c2be51083",
+      "size": 35632
+    },
+    "renderer.js": {
+      "url": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/files/renderer.js",
+      "sha256": "4da554524de876b87c59247f210abce332b77c2bc217730f4e30c2286ad91b3b",
+      "size": 50054
+    },
+    "styles.css": {
+      "url": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/files/styles.css",
+      "sha256": "1776354f44c1ffc2fbbb749a86c95512f1cc693f8e90223ab9c9ed971ab0e31c",
+      "size": 6524
+    },
+    "danea-order-xml.js": {
+      "url": "https://raw.githubusercontent.com/GabrieleSanetti/Easy-Sync-Shopify-Danea/main/remote_patch/files/danea-order-xml.js",
+      "sha256": "6ce9ee476255a2cd693300794d9c256ce9d9072e47801e43b1d81d759a163f15",
+      "size": 11867
+    }
+  },
+  "signature": "K2pn9jg/dPzE3BykDmL6veUUEua7zKh83n2DlxSJJ+eVt8s4KdiqZU5DCRgZEhlX+meA8yIeI6z7UiqwlgeSCw=="
 }
