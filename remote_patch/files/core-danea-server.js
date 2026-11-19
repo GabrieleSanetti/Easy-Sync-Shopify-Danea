@@ -155,6 +155,46 @@ async function handleDaneaSync(req, res, url, win) {
   recordDaneaSync(win, toUpdate, qtyCount, priceReport, syncDate, { qtyFailed, ambiguousSkus: ambiguousHits });
 }
 
+// Segue la connessione dall'inizio della richiesta e ritorna una funzione che dice se
+// la risposta è arrivata: true quando è consegnata al sistema, false se Danea ha
+// chiuso prima. Va chiamata PRIMA di preparare l'XML: su una connessione già chiusa
+// res.end() segna comunque la risposta come finita (verificato), quindi
+// writableFinished da solo non basta.
+function trackDelivery(res) {
+  let closedEarly = false;
+  res.once('close', () => { if (!res.writableFinished) closedEarly = true; });
+  return () => new Promise((resolve) => {
+    if (closedEarly) return resolve(false);
+    if (res.writableFinished) return resolve(true);
+    res.once('finish', () => resolve(!closedEarly));
+    res.once('close', () => resolve(res.writableFinished && !closedEarly));
+  });
+}
+
+// Il tag "Scaricato_Danea" toglie l'ordine dai prossimi scaricamenti, quindi si mette
+// solo dopo aver consegnato l'XML (prima partiva insieme alla risposta). Se la
+// connessione cade o un tag fallisce, l'ordine torna al prossimo scaricamento con lo
+// stesso numero /W e Danea lo scarta come doppione se l'aveva già importato.
+// Non lancia mai: la risposta a Danea è già partita.
+async function tagAfterDelivery(delivered, result) {
+  if (!result.count) return;
+  if (!(await delivered())) {
+    logLine(`  ! XML non consegnato: ${result.count} ordini senza tag, tornano al prossimo scaricamento`);
+    return;
+  }
+  let warning = null;
+  try {
+    const { tagged, failed } = await result.tagExported();
+    const list = failed.map((f) => `#${f.orderNumber} (${f.error})`).join(', ');
+    logLine(`  tag Scaricato_Danea: ${tagged} ordini${failed.length ? `; non taggati ${failed.length}: ${list}` : ''}`);
+    if (failed.length) warning = `${failed.length} ordini non taggati su Shopify: torneranno al prossimo scaricamento.`;
+  } catch (e) {
+    logLine(`  ! tag Scaricato_Danea non messi: ${e.message}`);
+    warning = `Tag "Scaricato_Danea" non messi: ${e.message}`;
+  }
+  if (warning && shared.tray) shared.tray.displayBalloon({ title: 'Ordini scaricati, tag incompleti', content: warning, iconType: 'warning' });
+}
+
 async function handleDaneaOrders(req, res, url) {
   logLine(`GET /danea-orders, ${credentialsSource(req, url)}`);
   if (!checkDaneaAuth(req.headers.authorization, url.searchParams, readSettings())) {
@@ -162,8 +202,9 @@ async function handleDaneaOrders(req, res, url) {
     return unauthorized(res);
   }
   const tray = shared.tray;
+  const delivered = trackDelivery(res);
   try {
-    const result = await generateDaneaOrdersXml(null, true);
+    const result = await generateDaneaOrdersXml();
     logLine(`  → 200: ${result.count || 0} ordini`);
     if (tray) {
       tray.displayBalloon({
@@ -173,6 +214,7 @@ async function handleDaneaOrders(req, res, url) {
       });
     }
     send(res, 200, result.xml, 'text/xml; charset=utf-8');
+    await tagAfterDelivery(delivered, result);
   } catch (error) {
     console.error(error);
     logLine(`  → 500: ${error.message}`);
